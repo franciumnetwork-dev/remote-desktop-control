@@ -8,7 +8,8 @@
   "description": "A code hosted on render so that you can use your computer via another computer in an entirely different network",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Tested successfully!\""
+    "test": "echo \"Tested successfully!\"",
+    "start": "node index.js"
   },
   "repository": {
     "type": "git",
