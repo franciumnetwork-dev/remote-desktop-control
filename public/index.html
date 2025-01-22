@@ -24,12 +24,19 @@
   <script>
     var isConnected = false;
     const key = prompt("Enter the key to control the screen:");
-    const socket = new WebSocket(`wss://remote-desktop-control.onrender.com/key/${key}`);
+    var socket;
+    function innitWithKey(key){
+    var socket = new WebSocket(`wss://remote-desktop-control.onrender.com/key/${key}`);
 
     const screenDiv = document.getElementById('screen');
     socket.addEventListener('open', () => {
       console.log('Connected to WebSocket server');
       isConnected = true;
+    });
+    socket.addEventListener('close', () => {
+      isConnected = false;
+      console.log('Websocket closed. Retrying.');
+      innitWithKey(key);
     });
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -69,8 +76,9 @@
       }
       e.preventDefault();
     });
-
+    }
     document.addEventListener('keydown', (e) => e.preventDefault());
+    innitWithKey(key);
   </script>
 </body>
 </html>
