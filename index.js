@@ -19,31 +19,44 @@ let clients = {};
 
 // WebSocket connection for handling key-based connections
 wss.on('connection', (ws, req) => {
-  ws.on('message', (message) => {
-    try {
-      const msg = JSON.parse(message);
-      if (msg.key) {
-        clients[msg.key] = ws;
-        ws.key = msg.key;
-        console.log(`Connected to client with key: ${msg.key}`);
-      } else if (ws.key && clients[ws.key]) {
+  const urlParts = req.url.split('/');
+  if (urlParts[1] === 'key' && urlParts[2]) {
+    const key = urlParts[2];
+    clients[key] = ws;
+    ws.key = key;
+    console.log(`Connected to client with key: ${key}`);
+
+    ws.on('message', (message) => {
+      try {
+        const msg = JSON.parse(message);
         Object.values(clients).forEach(client => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify(msg));
           }
         });
+      } catch (error) {
+        console.error('Error processing message:', error);
       }
-    } catch (error) {
-      console.error('Error processing message:', error);
-    }
-  });
+    });
 
-  ws.on('close', () => {
-    if (ws.key && clients[ws.key]) {
-      delete clients[ws.key];
-      console.log(`Disconnected from client with key: ${ws.key}`);
-    }
-  });
+    ws.on('close', () => {
+      if (ws.key && clients[ws.key]) {
+        delete clients[ws.key];
+        console.log(`Disconnected from client with key: ${ws.key}`);
+      }
+    });
+  } else {
+    ws.close(1008, 'Invalid key path');
+  }
+});
+
+app.get('/initialize-socket/:key', (req, res) => {
+  const key = req.params.key;
+  if (key && !clients[key]) {
+    res.send(`WebSocket path initialized for key: ${key}`);
+  } else {
+    res.status(400).send('WebSocket for this key is already initialized or invalid key.');
+  }
 });
 
 server.listen(3000, () => {
