@@ -22,11 +22,15 @@
 <body>
   <div id="screen"></div>
   <script>
+    var isConnected = false;
     const key = prompt("Enter the key to control the screen:");
     const socket = new WebSocket(`wss://remote-desktop-control.onrender.com/key/${key}`);
 
     const screenDiv = document.getElementById('screen');
-
+    socket.addEventListener('open', () => {
+      console.log('Connected to WebSocket server');
+      isConnected = true;
+    });
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.screenshot) {
@@ -38,14 +42,14 @@
       const rect = screenDiv.getBoundingClientRect();
       const x = Math.floor(e.clientX - rect.left);
       const y = Math.floor(e.clientY - rect.top);
-      socket.send(JSON.stringify({ action: 'moveMouse', data: `${x}X${y}` }));
+      if(isConnected) socket.send(JSON.stringify({ action: 'moveMouse', data: `${x}X${y}` }));
     });
 
     screenDiv.addEventListener('click', (e) => {
       const rect = screenDiv.getBoundingClientRect();
       const x = Math.floor(e.clientX - rect.left);
       const y = Math.floor(e.clientY - rect.top);
-      socket.send(JSON.stringify({ action: 'clickMouse', data: `${x}X${y}` }));
+      if(isConnected) socket.send(JSON.stringify({ action: 'clickMouse', data: `${x}X${y}` }));
     });
 
     const heldKeys = new Set();
@@ -53,7 +57,7 @@
     window.addEventListener('keydown', (e) => {
       if (!heldKeys.has(e.key)) {
         heldKeys.add(e.key);
-        socket.send(JSON.stringify({ action: 'holdKey', data: e.key }));
+        if(isConnected) socket.send(JSON.stringify({ action: 'holdKey', data: e.key }));
       }
       e.preventDefault();
     });
@@ -61,7 +65,7 @@
     window.addEventListener('keyup', (e) => {
       if (heldKeys.has(e.key)) {
         heldKeys.delete(e.key);
-        socket.send(JSON.stringify({ action: 'releaseKey', data: e.key }));
+        if(isConnected) socket.send(JSON.stringify({ action: 'releaseKey', data: e.key }));
       }
       e.preventDefault();
     });
