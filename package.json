@@ -1,0 +1,23 @@
+{
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  },
+  "name": "remote-desktop-control",
+  "version": "1.0.0",
+  "description": "A code hosted on render so that you can use your computer via another computer in an entirely different network",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Tested successfully!\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/franciumnetwork-dev/remote-desktop-control.git"
+  },
+  "author": "Francium Network",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/franciumnetwork-dev/remote-desktop-control/issues"
+  },
+  "homepage": "https://github.com/franciumnetwork-dev/remote-desktop-control#readme"
+}
