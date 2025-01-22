@@ -25,6 +25,7 @@ wss.on('connection', (ws, req) => {
     const key = urlParts[2];
     if (clients[key]) {
       ws.close(1008, 'Key already in use');
+      console.log("Key was in use.");
       return;
     }
     
@@ -62,6 +63,7 @@ wss.on('connection', (ws, req) => {
     });
   } else {
     ws.close(1008, 'Invalid key path');
+    console.log("It was an invalid key path.");
   }
 });
 
