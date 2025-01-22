@@ -26,7 +26,7 @@
     const key = prompt("Enter the key to control the screen:");
     var socket;
     function innitWithKey(key){
-    var socket = new WebSocket(`wss://remote-desktop-control.onrender.com/key/${key}`);
+    var socket = new WebSocket(`wss://remote-desktop-control.onrender.com/key/${key}browser`);
 
     const screenDiv = document.getElementById('screen');
     socket.addEventListener('open', () => {
