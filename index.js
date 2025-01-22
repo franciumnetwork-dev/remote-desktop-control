@@ -15,33 +15,33 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Store connected WebSocket clients by their key
-let clients = {}; // For storing controller-client mappings
-let assignedKeys = {}; // Maps keys to users (controlling and controlled client)
+// Store connected WebSocket clients by key
+const clients = new Map();
 
 // WebSocket connection handling
 wss.on('connection', (ws, req) => {
   const urlParts = req.url.split('/');
-  
+
   if (urlParts[1] === 'key' && urlParts[2]) {
     const key = urlParts[2];
 
-    // Check if the key has already been assigned to a controlled computer
-    if (assignedKeys[key] && assignedKeys[key] !== ws) {
-      ws.close(1008, 'Key is already in use for controlling another client');
-      console.log(`Key ${key} is already assigned. New connection rejected.`);
-      return;
+    // Check if the key is already in use
+    if (clients.has(key)) {
+      const existingClient = clients.get(key);
+      if (existingClient.readyState === WebSocket.OPEN) {
+        ws.close(1008, 'Key already in use');
+        console.log(`Key already in use: ${key}`);
+        return;
+      } else {
+        // If the existing client is disconnected, remove it
+        clients.delete(key);
+        console.log(`Removed stale client for key: ${key}`);
+      }
     }
 
-    // If the key is not in use, assign it to this connection
-    if (!assignedKeys[key]) {
-      assignedKeys[key] = ws; // Assign key to the controlling client (first connection)
-      console.log(`Assigned key ${key} to controlling client.`);
-    }
-
-    clients[key] = ws;
+    // Assign the key to the new connection
+    clients.set(key, ws);
     ws.key = key;
-
     console.log(`Connected to client with key: ${key}`);
 
     // Health check with ping/pong
@@ -57,15 +57,24 @@ wss.on('connection', (ws, req) => {
       console.log(`Pong received from client with key: ${ws.key}`);
     });
 
-    // Handle incoming messages (control messages)
+    // Handle incoming messages
     ws.on('message', (message) => {
       try {
         const msg = JSON.parse(message);
 
-        // Send control messages to the client associated with the key
-        const targetClient = assignedKeys[key];
-        if (targetClient && targetClient.readyState === WebSocket.OPEN) {
-          targetClient.send(JSON.stringify(msg));
+        // Identify complementary key (with or without "browser")
+        const normalizedKey = ws.key.endsWith('browser')
+          ? ws.key.slice(0, -7) // Remove "browser" if it exists
+          : `${ws.key}browser`; // Add "browser" if it doesn't exist
+
+        // Check if complementary key exists
+        if (clients.has(normalizedKey)) {
+          const targetClient = clients.get(normalizedKey);
+
+          if (targetClient.readyState === WebSocket.OPEN) {
+            // Send the message to the complementary client
+            targetClient.send(JSON.stringify(msg));
+          }
         }
       } catch (error) {
         console.error('Error processing message:', error);
@@ -74,9 +83,8 @@ wss.on('connection', (ws, req) => {
 
     // Handle disconnection
     ws.on('close', () => {
-      if (ws.key && clients[ws.key] === ws) {
-        delete clients[ws.key];
-        delete assignedKeys[ws.key]; // Free the key once the client disconnects
+      if (ws.key && clients.get(ws.key) === ws) {
+        clients.delete(ws.key);
         console.log(`Disconnected client with key: ${ws.key}`);
       }
     });
@@ -93,17 +101,17 @@ wss.on('connection', (ws, req) => {
 // Endpoint to initialize the WebSocket path for a given key
 app.get('/initialize-socket/:key', (req, res) => {
   const key = req.params.key;
-  
+
   if (!key) {
     res.status(400).send('Invalid key.');
     return;
   }
 
-  if (assignedKeys[key]) {
-    res.status(400).send('WebSocket for this key is already initialized and in use.');
+  if (clients.has(key)) {
+    res.status(400).send('WebSocket for this key is already initialized.');
     return;
   }
-  
+
   res.send(`WebSocket path initialized for key: ${key}`);
 });
 
