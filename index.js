@@ -15,13 +15,19 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-let clients = {};
+let clients = {}; // Store connected WebSocket clients by key
 
-// WebSocket connection for handling key-based connections
+// WebSocket connection handling
 wss.on('connection', (ws, req) => {
   const urlParts = req.url.split('/');
+  
   if (urlParts[1] === 'key' && urlParts[2]) {
     const key = urlParts[2];
+    if (clients[key]) {
+      ws.close(1008, 'Key already in use');
+      return;
+    }
+    
     clients[key] = ws;
     ws.key = key;
     console.log(`Connected to client with key: ${key}`);
@@ -29,6 +35,7 @@ wss.on('connection', (ws, req) => {
     ws.on('message', (message) => {
       try {
         const msg = JSON.parse(message);
+        // Broadcast the message to all clients except the sender
         Object.values(clients).forEach(client => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify(msg));
@@ -50,15 +57,19 @@ wss.on('connection', (ws, req) => {
   }
 });
 
+// Endpoint to initialize the WebSocket path for a given key
 app.get('/initialize-socket/:key', (req, res) => {
   const key = req.params.key;
-  if (key && !clients[key]) {
-    res.send(`WebSocket path initialized for key: ${key}`);
-  } else {
+  
+  if (!key || clients[key]) {
     res.status(400).send('WebSocket for this key is already initialized or invalid key.');
+    return;
   }
+  
+  res.send(`WebSocket path initialized for key: ${key}`);
 });
 
+// Start the HTTP server
 server.listen(3000, () => {
   console.log('Server running on http://localhost:3000');
 });
