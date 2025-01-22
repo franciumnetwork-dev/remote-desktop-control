@@ -31,7 +31,15 @@ wss.on('connection', (ws, req) => {
     clients[key] = ws;
     ws.key = key;
     console.log(`Connected to client with key: ${key}`);
+  const interval = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.ping(); // Send a ping frame
+    }
+  }, 1000); // Every 1 second
 
+  ws.on('pong', () => {
+    console.log(`Pong received from client with key: ${ws.key}`);
+  });
     ws.on('message', (message) => {
       try {
         const msg = JSON.parse(message);
