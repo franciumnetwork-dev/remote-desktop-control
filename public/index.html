@@ -26,7 +26,6 @@
     const socket = new WebSocket(`wss://remote-desktop-control.onrender.com/key/${key}`);
 
     const screenDiv = document.getElementById('screen');
-    screenDiv.requestFullscreen();
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
