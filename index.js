@@ -15,7 +15,8 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-let clients = {}; // Store connected WebSocket clients by key
+// Store connected WebSocket clients by key
+const clients = new Map();
 
 // WebSocket connection handling
 wss.on('connection', (ws, req) => {
@@ -23,29 +24,46 @@ wss.on('connection', (ws, req) => {
   
   if (urlParts[1] === 'key' && urlParts[2]) {
     const key = urlParts[2];
-    if (clients[key]) {
-      ws.close(1008, 'Key already in use');
-      console.log("Key was in use.");
-      return;
+
+    // Check if the key is already in use
+    if (clients.has(key)) {
+      const existingClient = clients.get(key);
+      if (existingClient.readyState === WebSocket.OPEN) {
+        ws.close(1008, 'Key already in use');
+        console.log(`Key already in use: ${key}`);
+        return;
+      } else {
+        // If the existing client is disconnected, remove it
+        clients.delete(key);
+        console.log(`Removed stale client for key: ${key}`);
+      }
     }
-    
-    clients[key] = ws;
+
+    // Assign the key to the new connection
+    clients.set(key, ws);
     ws.key = key;
     console.log(`Connected to client with key: ${key}`);
-  const interval = setInterval(() => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.ping(); // Send a ping frame
-    }
-  }, 1000); // Every 1 second
 
-  ws.on('pong', () => {
-    console.log(`Pong received from client with key: ${ws.key}`);
-  });
+    // Health check with ping/pong
+    const interval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.ping();
+      } else {
+        clearInterval(interval);
+      }
+    }, 10000); // Every 10 seconds
+
+    ws.on('pong', () => {
+      console.log(`Pong received from client with key: ${ws.key}`);
+    });
+
+    // Handle incoming messages
     ws.on('message', (message) => {
       try {
         const msg = JSON.parse(message);
-        // Broadcast the message to all clients except the sender
-        Object.values(clients).forEach(client => {
+
+        // Broadcast to all clients except the sender
+        clients.forEach((client, clientKey) => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify(msg));
           }
@@ -55,15 +73,20 @@ wss.on('connection', (ws, req) => {
       }
     });
 
+    // Handle disconnection
     ws.on('close', () => {
-      if (ws.key && clients[ws.key]) {
-        delete clients[ws.key];
-        console.log(`Disconnected from client with key: ${ws.key}`);
+      if (ws.key && clients.get(ws.key) === ws) {
+        clients.delete(ws.key);
+        console.log(`Disconnected client with key: ${ws.key}`);
       }
+    });
+
+    ws.on('error', (err) => {
+      console.error(`Error on client with key ${ws.key}:`, err);
     });
   } else {
     ws.close(1008, 'Invalid key path');
-    console.log("It was an invalid key path.");
+    console.log('Invalid key path.');
   }
 });
 
@@ -71,8 +94,13 @@ wss.on('connection', (ws, req) => {
 app.get('/initialize-socket/:key', (req, res) => {
   const key = req.params.key;
   
-  if (!key || clients[key]) {
-    res.status(400).send('WebSocket for this key is already initialized or invalid key.');
+  if (!key) {
+    res.status(400).send('Invalid key.');
+    return;
+  }
+  
+  if (clients.has(key)) {
+    res.status(400).send('WebSocket for this key is already initialized.');
     return;
   }
   
