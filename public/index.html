@@ -24,7 +24,7 @@
   <img id="theScreen" src="" alt="Remote Screen">
   <script>
 var isConnected = false;
-const key = prompt("Enter the key to control the screen:");
+const key = new URLSearchParams(window.location.search).get('key') | prompt("Enter the key to control the screen:");
 const parsedDem = atob(key.slice(32));
 var width = parseInt(parsedDem.split("x")[0]);
 var height = parseInt(parsedDem.split("x")[1]); // Corrected parsing
