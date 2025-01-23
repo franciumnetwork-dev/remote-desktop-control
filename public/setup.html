@@ -1,23 +1,82 @@
-<html>
-  <body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Remote Control Key</title>
+  <style>
+    body {
+      background-color: black;
+      color: #00ff00;
+      font-family: "Courier New", Courier, monospace;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    h1, h2 {
+      color: #00ff00;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      color: #ff0000;
+    }
+
+    a {
+      color: #00ff00;
+      text-decoration: none;
+      border: 1px solid #00ff00;
+      padding: 5px 10px;
+      display: inline-block;
+      margin-top: 10px;
+    }
+
+    a:hover {
+      background-color: #00ff00;
+      color: black;
+    }
+
+    .error {
+      color: red;
+      border: 1px solid red;
+      padding: 10px;
+      margin-top: 20px;
+    }
+
+    .container {
+      border: 2px solid #00ff00;
+      padding: 20px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
     <h1>Use this key to control your computer:</h1>
     <h2>WARNING ⚠⚠⚠: THE FOLLOWING INFORMATION CAN ALLOW ATTACKERS TO CONTROL YOUR SCREEN. PLEASE BE CAREFUL.</h2>
-    <p></p>
+    <p id="key-display"></p>
     <br>
-    <p>And click <a href='https://remote-desktop-control.onrender.com/'>here</a> to remote control a computer with a key.</p>
-    <p>Alternatively, you can just visit <a href='https://remote-desktop-control.onrender.com?key='>here</a> without it prompting for key.</p>
-    <script>
-      function returnError(message){
-        document.body.innerHTML = "<p>Error: "+ message +"</p>";
-        return "unknown";
-      }
-      try{
-        const key = new URLSearchParams(window.location.search).get('key') || returnError("Key parameter not provided");
-        document.querySelector("p").innerText = key;
-        document.querySelectorAll("a")[1].setAttribute("href", 'https://remote-desktop-control.onrender.com?key=' + key);
-      } catch(e){
-        returnError(e.message);
-      }
-    </script>
-  </body>
+    <a href="https://remote-desktop-control.onrender.com/" target="_blank">Remote Control a Computer</a>
+    <a id="direct-link" href="https://remote-desktop-control.onrender.com?key=" target="_blank">Access Without Prompt</a>
+  </div>
+
+  <script>
+    function returnError(message) {
+      const errorElement = document.createElement("div");
+      errorElement.className = "error";
+      errorElement.innerText = `Error: ${message}`;
+      document.body.appendChild(errorElement);
+      return "unknown";
+    }
+
+    try {
+      const key = new URLSearchParams(window.location.search).get('key') || returnError("Key parameter not provided");
+      document.getElementById("key-display").innerText = key;
+      document.getElementById("direct-link").setAttribute("href", `https://remote-desktop-control.onrender.com?key=${key}`);
+    } catch (e) {
+      returnError(e.message);
+    }
+  </script>
+</body>
 </html>
