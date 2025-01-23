@@ -1,0 +1,23 @@
+<html>
+  <body>
+    <h1>Use this key to control your computer:</h1>
+    <h2>WARNING ⚠⚠⚠: THE FOLLOWING INFORMATION CAN ALLOW ATTACKERS TO CONTROL YOUR SCREEN. PLEASE BE CAREFUL.</h2>
+    <p></p>
+    <br>
+    <p>And click <a href='https://remote-desktop-control.onrender.com/'>here</a> to remote control a computer with a key.</p>
+    <p>Alternatively, you can just visit <a href='https://remote-desktop-control.onrender.com?key='>here</a> without it prompting for key.</p>
+    <script>
+      function returnError(message){
+        document.body.innerHTML = "<p>Error: "+ message +"</p>";
+        return "unknown";
+      }
+      try{
+        const key = new URLSearchParams(window.location.search).get('key') | returnError("Key parameter not provided");
+        document.querySelector("p").innerText = key;
+        document.querySelectorAll("a")[1].setAttribute("href", 'https://remote-desktop-control.onrender.com?key=' + key);
+      } catch(e){
+        returnError(e.message);
+      }
+    </script>
+  </body>
+</html>
