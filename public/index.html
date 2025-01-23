@@ -63,8 +63,8 @@ function innitWithKey(key) {
 
   screen.addEventListener('mousemove', (e) => {
     const rect = screen.getBoundingClientRect();
-    const x = Math.floor(e.clientX - rect.left);
-    const y = Math.floor(e.clientY - rect.top);
+    const x =  Math.floor((e.clientX - rect.left) * width / window.innerWidth);
+    const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
     if (isConnected) {
       socket.send(JSON.stringify({ action: 'moveMouse', data: `${x}X${y}` }));
     }
