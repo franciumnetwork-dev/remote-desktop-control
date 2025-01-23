@@ -12,7 +12,7 @@
         return "unknown";
       }
       try{
-        const key = new URLSearchParams(window.location.search).get('key') | returnError("Key parameter not provided");
+        const key = new URLSearchParams(window.location.search).get('key') || returnError("Key parameter not provided");
         document.querySelector("p").innerText = key;
         document.querySelectorAll("a")[1].setAttribute("href", 'https://remote-desktop-control.onrender.com?key=' + key);
       } catch(e){
