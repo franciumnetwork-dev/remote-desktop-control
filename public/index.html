@@ -70,14 +70,27 @@ function innitWithKey(key) {
     }
   });
 
-  screen.addEventListener('click', (e) => {
+document.addEventListener("mousedown", (e) => {
     const rect = screen.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) * width / window.innerWidth);
+    const x =  Math.floor((e.clientX - rect.left) * width / window.innerWidth);
     const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
+    let buttonName = getMouseButton(e.button);
     if (isConnected) {
-      socket.send(JSON.stringify({ action: 'clickMouse', data: `${x}X${y}` }));
+      socket.send(JSON.stringify({ action: 'holdMouse', data: `${x}X${y}Y${buttonName}` }));
     }
-  });
+    e.preventDefault();
+});
+
+document.addEventListener("mouseup", (e) => {
+    const rect = screen.getBoundingClientRect();
+    const x =  Math.floor((e.clientX - rect.left) * width / window.innerWidth);
+    const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
+    let buttonName = getMouseButton(e.button);
+    if (isConnected) {
+      socket.send(JSON.stringify({ action: 'releaseMouse', data: `${x}X${y}Y${buttonName}` }));
+    }
+    e.preventDefault();
+});
 
   const heldKeys = new Set();
 
@@ -101,7 +114,18 @@ function innitWithKey(key) {
     e.preventDefault();
   });
 }
-
+function getMouseButton(button) {
+    switch (button) {
+        case 0:
+            return "left";
+        case 1:
+            return "middle";
+        case 2:
+            return "right";
+        default:
+            return "left";
+    }
+}
 document.addEventListener('keydown', (e) => e.preventDefault());
 innitWithKey(key);
   </script>
