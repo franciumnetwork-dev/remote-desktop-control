@@ -1,84 +1,81 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Remote Desktop Control</title>
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-    }
-    #screen {
-      width: 100%;
-      height: 100vh;
-      object-fit: cover;
-      background: black;
-      cursor: none;
-    }
-  </style>
-</head>
-<body>
-  <div id="screen"></div>
-  <script>
-    var isConnected = false;
-    const key = prompt("Enter the key to control the screen:");
-    var socket;
-    function innitWithKey(key){
-    var socket = new WebSocket(`wss://remote-desktop-control.onrender.com/key/${key}browser`);
+var isConnected = false;
+const key = prompt("Enter the key to control the screen:");
+const parsedDem = atob(key.slice(32));
+var width = parseInt(parsedDem.split("x")[0]);
+var height = parseInt(parsedDem.split("x")[1]); // Corrected parsing
+var socket;
 
-    const screenDiv = document.getElementById('screen');
-    socket.addEventListener('open', () => {
-      console.log('Connected to WebSocket server');
-      isConnected = true;
-    });
-    socket.addEventListener('close', () => {
-      isConnected = false;
-      console.log('Websocket closed. Retrying.');
-      innitWithKey(key);
-    });
-    socket.onmessage = (event) => {
+function innitWithKey(key) {
+  socket = new WebSocket(`wss://remote-desktop-control.onrender.com/key/${key}browser`);
+
+  socket.addEventListener('open', () => {
+    console.log('Connected to WebSocket server');
+    isConnected = true;
+  });
+
+  socket.addEventListener('close', () => {
+    isConnected = false;
+    console.log('WebSocket closed. Retrying in 2 seconds...');
+    setTimeout(() => innitWithKey(key), 2000); // Retry connection after 2 seconds
+  });
+
+  socket.addEventListener('error', (err) => {
+    console.error('WebSocket error:', err);
+  });
+
+  socket.addEventListener('message', (event) => {
+    try {
       const data = JSON.parse(event.data);
       if (data.screenshot) {
-        screenDiv.style.backgroundImage = `url(data:image/jpeg;base64,${data.screenshot})`;
+        document.getElementById("theScreen").src = `data:image/jpeg;base64,${data.screenshot}`;
       }
-    };
-
-    screenDiv.addEventListener('mousemove', (e) => {
-      const rect = screenDiv.getBoundingClientRect();
-      const x = Math.floor(e.clientX - rect.left);
-      const y = Math.floor(e.clientY - rect.top);
-      if(isConnected) socket.send(JSON.stringify({ action: 'moveMouse', data: `${x}X${y}` }));
-    });
-
-    screenDiv.addEventListener('click', (e) => {
-      const rect = screenDiv.getBoundingClientRect();
-      const x = Math.floor(e.clientX - rect.left);
-      const y = Math.floor(e.clientY - rect.top);
-      if(isConnected) socket.send(JSON.stringify({ action: 'clickMouse', data: `${x}X${y}` }));
-    });
-
-    const heldKeys = new Set();
-
-    window.addEventListener('keydown', (e) => {
-      if (!heldKeys.has(e.key)) {
-        heldKeys.add(e.key);
-        if(isConnected) socket.send(JSON.stringify({ action: 'holdKey', data: e.key }));
-      }
-      e.preventDefault();
-    });
-
-    window.addEventListener('keyup', (e) => {
-      if (heldKeys.has(e.key)) {
-        heldKeys.delete(e.key);
-        if(isConnected) socket.send(JSON.stringify({ action: 'releaseKey', data: e.key }));
-      }
-      e.preventDefault();
-    });
+    } catch (err) {
+      console.error('Error parsing message:', err);
     }
-    document.addEventListener('keydown', (e) => e.preventDefault());
-    innitWithKey(key);
-  </script>
-</body>
-</html>
+  });
+
+  const screen = document.getElementById("theScreen");
+
+  screen.addEventListener('mousemove', (e) => {
+    const rect = screen.getBoundingClientRect();
+    const x = Math.floor(e.clientX - rect.left);
+    const y = Math.floor(e.clientY - rect.top);
+    if (isConnected) {
+      socket.send(JSON.stringify({ action: 'moveMouse', data: `${x}X${y}` }));
+    }
+  });
+
+  screen.addEventListener('click', (e) => {
+    const rect = screen.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) * width / window.innerWidth);
+    const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
+    if (isConnected) {
+      socket.send(JSON.stringify({ action: 'clickMouse', data: `${x}X${y}` }));
+    }
+  });
+
+  const heldKeys = new Set();
+
+  window.addEventListener('keydown', (e) => {
+    if (!heldKeys.has(e.key)) {
+      heldKeys.add(e.key);
+      if (isConnected) {
+        socket.send(JSON.stringify({ action: 'holdKey', data: e.key }));
+      }
+    }
+    e.preventDefault();
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (heldKeys.has(e.key)) {
+      heldKeys.delete(e.key);
+      if (isConnected) {
+        socket.send(JSON.stringify({ action: 'releaseKey', data: e.key }));
+      }
+    }
+    e.preventDefault();
+  });
+}
+
+document.addEventListener('keydown', (e) => e.preventDefault());
+innitWithKey(key);
