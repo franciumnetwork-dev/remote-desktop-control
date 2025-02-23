@@ -48,6 +48,7 @@
       socket.binaryType = 'arraybuffer';
 
       socket.addEventListener('open', () => {
+        socket.send(JSON.stringify({ action: 'remoteControlActive', data: "Test" }));
         console.log('Connected to WebSocket server');
         isConnected = true;
       });
