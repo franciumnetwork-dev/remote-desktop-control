@@ -12,7 +12,7 @@
       width: 100vw;
       height: 100vh;
     }
-    /* The video element fills the screen */
+    /* Video element fills the screen */
     #theScreen {
       display: block;
       width: 100%;
@@ -22,18 +22,18 @@
   </style>
 </head>
 <body>
-  <!-- Using a video element (no controls) -->
+  <!-- Using a video element with MediaSource for a continuous stream -->
   <video id="theScreen" autoplay muted></video>
   <script>
     // Retrieve key (or prompt)
     const key = new URLSearchParams(window.location.search).get('key') || prompt("Enter the key:");
     const parsedDem = atob(key.slice(32));
-    var width = parseInt(parsedDem.split("x")[0]);
-    var height = parseInt(parsedDem.split("x")[1]);
-    var socket;
+    const width = parseInt(parsedDem.split("x")[0]);
+    const height = parseInt(parsedDem.split("x")[1]);
+    let socket;
     let isConnected = false;
 
-    // Setup MediaSource to receive video (WebM VP8)
+    // Setup MediaSource for incoming WebM video (VP8)
     const video = document.getElementById('theScreen');
     const mediaSource = new MediaSource();
     video.src = URL.createObjectURL(mediaSource);
@@ -43,7 +43,7 @@
     });
 
     function innitWithKey(key) {
-      // Connect to WS using the complementary key (append "browser")
+      // Connect using the complementary key (append "browser")
       socket = new WebSocket(`wss://remote-desktop-control.onrender.com/key/${key}browser`);
       socket.binaryType = 'arraybuffer';
 
@@ -65,7 +65,7 @@
       socket.addEventListener('message', (event) => {
         try {
           const data = JSON.parse(event.data);
-          // When a video packet is received, decode and append it
+          // When a video packet is received, append it to the SourceBuffer
           if (data.videoPacket && sourceBuffer && !sourceBuffer.updating) {
             const binary = Uint8Array.from(atob(data.videoPacket), c => c.charCodeAt(0));
             sourceBuffer.appendBuffer(binary);
@@ -75,15 +75,15 @@
         }
       });
 
-      // Prevent pausing: if the video is paused, immediately play
+      // Disable pause: if the video is paused, immediately play
       video.addEventListener('pause', () => {
         video.play();
       });
 
-      // Control event listeners (mouse & keyboard)
+      // Send control commands using the video element as the event target
       video.addEventListener('mousemove', (e) => {
         const rect = video.getBoundingClientRect();
-        const x =  Math.floor((e.clientX - rect.left) * width / window.innerWidth);
+        const x = Math.floor((e.clientX - rect.left) * width / window.innerWidth);
         const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
         if (isConnected) {
           socket.send(JSON.stringify({ action: 'moveMouse', data: `${x}X${y}` }));
@@ -92,9 +92,9 @@
 
       video.addEventListener('mousedown', (e) => {
         const rect = video.getBoundingClientRect();
-        const x =  Math.floor((e.clientX - rect.left) * width / window.innerWidth);
+        const x = Math.floor((e.clientX - rect.left) * width / window.innerWidth);
         const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
-        let buttonName = getMouseButton(e.button);
+        const buttonName = getMouseButton(e.button);
         if (isConnected) {
           socket.send(JSON.stringify({ action: 'holdMouse', data: `${x}X${y}Y${buttonName}` }));
         }
@@ -103,9 +103,9 @@
 
       video.addEventListener('mouseup', (e) => {
         const rect = video.getBoundingClientRect();
-        const x =  Math.floor((e.clientX - rect.left) * width / window.innerWidth);
+        const x = Math.floor((e.clientX - rect.left) * width / window.innerWidth);
         const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
-        let buttonName = getMouseButton(e.button);
+        const buttonName = getMouseButton(e.button);
         if (isConnected) {
           socket.send(JSON.stringify({ action: 'releaseMouse', data: `${x}X${y}Y${buttonName}` }));
         }
