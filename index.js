@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const dgram = require('dgram');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,17 +16,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Store connected WebSocket clients by key
+// Map for connected WebSocket clients by key
 const clients = new Map();
 
-// WebSocket connection handling
+// WebSocket connection handling (for control & video forwarding)
 wss.on('connection', (ws, req) => {
   const urlParts = req.url.split('/');
-
   if (urlParts[1] === 'key' && urlParts[2]) {
     const key = urlParts[2];
-
-    // Check if the key is already in use
     if (clients.has(key)) {
       const existingClient = clients.get(key);
       if (existingClient.readyState === WebSocket.OPEN) {
@@ -33,16 +31,13 @@ wss.on('connection', (ws, req) => {
         console.log(`Key already in use: ${key}`);
         return;
       } else {
-        // If the existing client is disconnected, remove it
         clients.delete(key);
         console.log(`Removed stale client for key: ${key}`);
       }
     }
-
-    // Assign the key to the new connection
     clients.set(key, ws);
     ws.key = key;
-    console.log(`Connected to client with key: ${key}`);
+    console.log(`Connected client with key: ${key}`);
 
     // Health check with ping/pong
     const interval = setInterval(() => {
@@ -51,28 +46,22 @@ wss.on('connection', (ws, req) => {
       } else {
         clearInterval(interval);
       }
-    }, 10000); // Every 10 seconds
+    }, 10000);
 
     ws.on('pong', () => {
       console.log(`Pong received from client with key: ${ws.key}`);
     });
 
-    // Handle incoming messages
+    // Forward incoming control messages to complementary client
     ws.on('message', (message) => {
       try {
         const msg = JSON.parse(message);
-
-        // Identify complementary key (with or without "browser")
         const normalizedKey = ws.key.endsWith('browser')
-          ? ws.key.slice(0, -7) // Remove "browser" if it exists
-          : `${ws.key}browser`; // Add "browser" if it doesn't exist
-
-        // Check if complementary key exists
+          ? ws.key.slice(0, -7)
+          : ws.key + 'browser';
         if (clients.has(normalizedKey)) {
           const targetClient = clients.get(normalizedKey);
-
           if (targetClient.readyState === WebSocket.OPEN) {
-            // Send the message to the complementary client
             targetClient.send(JSON.stringify(msg));
           }
         }
@@ -81,7 +70,6 @@ wss.on('connection', (ws, req) => {
       }
     });
 
-    // Handle disconnection
     ws.on('close', () => {
       if (ws.key && clients.get(ws.key) === ws) {
         clients.delete(ws.key);
@@ -98,24 +86,46 @@ wss.on('connection', (ws, req) => {
   }
 });
 
-// Endpoint to initialize the WebSocket path for a given key
+// UDP server to receive video packets from Python
+const udpServer = dgram.createSocket('udp4');
+udpServer.on('message', (msg, rinfo) => {
+  // Expect header "KEY:<key>;" at beginning of packet
+  const headerEnd = msg.indexOf(';');
+  if (headerEnd !== -1) {
+    const header = msg.slice(0, headerEnd).toString();
+    if (header.startsWith("KEY:")) {
+      const key = header.slice(4);
+      const videoData = msg.slice(headerEnd + 1);
+      // Determine the complementary key (for the browser)
+      const normalizedKey = key.endsWith('browser') ? key.slice(0, -7) : key + 'browser';
+      if (clients.has(normalizedKey)) {
+        const targetClient = clients.get(normalizedKey);
+        if (targetClient.readyState === WebSocket.OPEN) {
+          // Send the video packet (base64 encoded) to the browser
+          targetClient.send(JSON.stringify({ videoPacket: videoData.toString('base64') }));
+        }
+      }
+    }
+  }
+});
+udpServer.bind(4000, () => {
+  console.log('UDP server listening on port 4000');
+});
+
+// Endpoint to initialize WebSocket for a given key
 app.get('/initialize-socket/:key', (req, res) => {
   const key = req.params.key;
-
   if (!key) {
     res.status(400).send('Invalid key.');
     return;
   }
-
   if (clients.has(key)) {
     res.status(400).send('WebSocket for this key is already initialized.');
     return;
   }
-
   res.send(`WebSocket path initialized for key: ${key}`);
 });
 
-// Start the HTTP server
 server.listen(3000, () => {
   console.log('Server running on http://localhost:3000');
 });
