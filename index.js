@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
-const dgram = require('dgram');
 
 const app = express();
 const server = http.createServer(app);
@@ -11,7 +10,7 @@ const wss = new WebSocket.Server({ server });
 // Serve static files for the web interface
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Routes
+// Route for the main page
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -19,7 +18,7 @@ app.get('/', (req, res) => {
 // Map for connected WebSocket clients by key
 const clients = new Map();
 
-// WebSocket connection handling (for control & video forwarding)
+// Handle WebSocket connections (for both control and video)
 wss.on('connection', (ws, req) => {
   const urlParts = req.url.split('/');
   if (urlParts[1] === 'key' && urlParts[2]) {
@@ -52,7 +51,7 @@ wss.on('connection', (ws, req) => {
       console.log(`Pong received from client with key: ${ws.key}`);
     });
 
-    // Forward incoming control messages to complementary client
+    // Forward incoming messages to the complementary client
     ws.on('message', (message) => {
       try {
         const msg = JSON.parse(message);
@@ -84,32 +83,6 @@ wss.on('connection', (ws, req) => {
     ws.close(1008, 'Invalid key path');
     console.log('Invalid key path.');
   }
-});
-
-// UDP server to receive video packets from Python
-const udpServer = dgram.createSocket('udp4');
-udpServer.on('message', (msg, rinfo) => {
-  // Expect header "KEY:<key>;" at beginning of packet
-  const headerEnd = msg.indexOf(';');
-  if (headerEnd !== -1) {
-    const header = msg.slice(0, headerEnd).toString();
-    if (header.startsWith("KEY:")) {
-      const key = header.slice(4);
-      const videoData = msg.slice(headerEnd + 1);
-      // Determine the complementary key (for the browser)
-      const normalizedKey = key.endsWith('browser') ? key.slice(0, -7) : key + 'browser';
-      if (clients.has(normalizedKey)) {
-        const targetClient = clients.get(normalizedKey);
-        if (targetClient.readyState === WebSocket.OPEN) {
-          // Send the video packet (base64 encoded) to the browser
-          targetClient.send(JSON.stringify({ videoPacket: videoData.toString('base64') }));
-        }
-      }
-    }
-  }
-});
-udpServer.bind(4000, () => {
-  console.log('UDP server listening on port 4000');
 });
 
 // Endpoint to initialize WebSocket for a given key
