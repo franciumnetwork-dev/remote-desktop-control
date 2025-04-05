@@ -23,112 +23,121 @@
 <body>
   <img id="theScreen" src="" alt="Remote Screen">
   <script>
-var isConnected = false;
-const key = new URLSearchParams(window.location.search).get('key') || prompt("Enter the key to control the screen:");
-const parsedDem = atob(key.slice(32));
-var width = parseInt(parsedDem.split("x")[0]);
-var height = parseInt(parsedDem.split("x")[1]); // Corrected parsing
-var socket;
+    var isConnected = false;
+    const key = new URLSearchParams(window.location.search).get('key') || prompt("Enter the key to control the screen:");
+    const parsedDem = atob(key.slice(32));
+    var width = parseInt(parsedDem.split("x")[0]);
+    var height = parseInt(parsedDem.split("x")[1]); // Corrected parsing
+    var socket;
 
-function innitWithKey(key) {
-  socket = new WebSocket(`wss://remote-desktop-control.onrender.com/key/${key}browser`);
+    function innitWithKey(key) {
+      socket = new WebSocket(`wss://remote-desktop-control.onrender.com/key/${key}browser`);
 
-  socket.addEventListener('open', () => {
-    console.log('Connected to WebSocket server');
-    isConnected = true;
-  });
+      socket.addEventListener('open', () => {
+        console.log('Connected to WebSocket server');
+        isConnected = true;
+      });
 
-  socket.addEventListener('close', () => {
-    isConnected = false;
-    console.log('WebSocket closed. Retrying in 2 seconds...');
-    setTimeout(() => innitWithKey(key), 2000); // Retry connection after 2 seconds
-  });
+      socket.addEventListener('close', () => {
+        isConnected = false;
+        console.log('WebSocket closed. Retrying in 2 seconds...');
+        setTimeout(() => innitWithKey(key), 2000); // Retry connection after 2 seconds
+      });
 
-  socket.addEventListener('error', (err) => {
-    console.error('WebSocket error:', err);
-  });
+      socket.addEventListener('error', (err) => {
+        console.error('WebSocket error:', err);
+      });
 
-  socket.addEventListener('message', (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      if (data.screenshot) {
-        document.getElementById("theScreen").src = `data:image/jpeg;base64,${data.screenshot}`;
-      }
-    } catch (err) {
-      console.error('Error parsing message:', err);
+      socket.addEventListener('message', async (event) => {
+        try {
+          let messageData;
+          // Check if the data is a Blob and convert it to text
+          if (event.data instanceof Blob) {
+            messageData = await event.data.text();
+          } else {
+            messageData = event.data;
+          }
+          const data = JSON.parse(messageData);
+          if (data.screenshot) {
+            document.getElementById("theScreen").src = `data:image/jpeg;base64,${data.screenshot}`;
+          }
+        } catch (err) {
+          console.error('Error parsing message:', err);
+        }
+      });
+
+      const screen = document.getElementById("theScreen");
+
+      screen.addEventListener('mousemove', (e) => {
+        const rect = screen.getBoundingClientRect();
+        const x = Math.floor((e.clientX - rect.left) * width / window.innerWidth);
+        const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
+        if (isConnected) {
+          socket.send(JSON.stringify({ action: 'moveMouse', data: `${x}X${y}` }));
+        }
+      });
+
+      document.addEventListener("mousedown", (e) => {
+        const rect = screen.getBoundingClientRect();
+        const x = Math.floor((e.clientX - rect.left) * width / window.innerWidth);
+        const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
+        let buttonName = getMouseButton(e.button);
+        if (isConnected) {
+          socket.send(JSON.stringify({ action: 'holdMouse', data: `${x}X${y}Y${buttonName}` }));
+        }
+        e.preventDefault();
+      });
+
+      document.addEventListener("mouseup", (e) => {
+        const rect = screen.getBoundingClientRect();
+        const x = Math.floor((e.clientX - rect.left) * width / window.innerWidth);
+        const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
+        let buttonName = getMouseButton(e.button);
+        if (isConnected) {
+          socket.send(JSON.stringify({ action: 'releaseMouse', data: `${x}X${y}Y${buttonName}` }));
+        }
+        e.preventDefault();
+      });
+
+      const heldKeys = new Set();
+
+      window.addEventListener('keydown', (e) => {
+        if (!heldKeys.has(e.key)) {
+          heldKeys.add(e.key);
+          if (isConnected) {
+            socket.send(JSON.stringify({ action: 'holdKey', data: e.key }));
+          }
+        }
+        e.preventDefault();
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (heldKeys.has(e.key)) {
+          heldKeys.delete(e.key);
+          if (isConnected) {
+            socket.send(JSON.stringify({ action: 'releaseKey', data: e.key }));
+          }
+        }
+        e.preventDefault();
+      });
     }
-  });
 
-  const screen = document.getElementById("theScreen");
-
-  screen.addEventListener('mousemove', (e) => {
-    const rect = screen.getBoundingClientRect();
-    const x =  Math.floor((e.clientX - rect.left) * width / window.innerWidth);
-    const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
-    if (isConnected) {
-      socket.send(JSON.stringify({ action: 'moveMouse', data: `${x}X${y}` }));
-    }
-  });
-
-document.addEventListener("mousedown", (e) => {
-    const rect = screen.getBoundingClientRect();
-    const x =  Math.floor((e.clientX - rect.left) * width / window.innerWidth);
-    const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
-    let buttonName = getMouseButton(e.button);
-    if (isConnected) {
-      socket.send(JSON.stringify({ action: 'holdMouse', data: `${x}X${y}Y${buttonName}` }));
-    }
-    e.preventDefault();
-});
-
-document.addEventListener("mouseup", (e) => {
-    const rect = screen.getBoundingClientRect();
-    const x =  Math.floor((e.clientX - rect.left) * width / window.innerWidth);
-    const y = Math.floor((e.clientY - rect.top) * height / window.innerHeight);
-    let buttonName = getMouseButton(e.button);
-    if (isConnected) {
-      socket.send(JSON.stringify({ action: 'releaseMouse', data: `${x}X${y}Y${buttonName}` }));
-    }
-    e.preventDefault();
-});
-
-  const heldKeys = new Set();
-
-  window.addEventListener('keydown', (e) => {
-    if (!heldKeys.has(e.key)) {
-      heldKeys.add(e.key);
-      if (isConnected) {
-        socket.send(JSON.stringify({ action: 'holdKey', data: e.key }));
-      }
-    }
-    e.preventDefault();
-  });
-
-  window.addEventListener('keyup', (e) => {
-    if (heldKeys.has(e.key)) {
-      heldKeys.delete(e.key);
-      if (isConnected) {
-        socket.send(JSON.stringify({ action: 'releaseKey', data: e.key }));
-      }
-    }
-    e.preventDefault();
-  });
-}
-function getMouseButton(button) {
-    switch (button) {
+    function getMouseButton(button) {
+      switch (button) {
         case 0:
-            return "left";
+          return "left";
         case 1:
-            return "middle";
+          return "middle";
         case 2:
-            return "right";
+          return "right";
         default:
-            return "left";
+          return "left";
+      }
     }
-}
-document.addEventListener('keydown', (e) => e.preventDefault());
-document.addEventListener('contextmenu', (e) => e.preventDefault());
-innitWithKey(key);
+
+    document.addEventListener('keydown', (e) => e.preventDefault());
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+    innitWithKey(key);
   </script>
 </body>
 </html>
